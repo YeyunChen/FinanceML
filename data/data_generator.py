@@ -24,7 +24,7 @@ def create_tick_data(
     bidask = bidask < 0.5
 
     X = pd.DataFrame({'price': price, 'size': volume, 'isbid': bidask}, index=ts)
-    print(len(X))
+    return X
 
 
 if __name__ == '__main__':
