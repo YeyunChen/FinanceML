@@ -82,6 +82,7 @@ def getBinsMeta(events, close):
     return out
 
 
+
 def getBins(events, close):
     """
     Compute event's outcome (including side information, if provided).
@@ -122,3 +123,7 @@ def dropLabels(events, minPct=.05):
         print('dropped label', df0.argmin(), df0.min())
         events = events[events['bin'] != df0.argmin()]
     return events
+
+
+if __name__ == '__main__':
+    print(2)
