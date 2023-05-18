@@ -76,6 +76,13 @@ def roll_model(trades, bar_size):
     return c
 
 
+def calc_tob_spread(source_date):
+    quotes = dutil.read_tob(source_date)
+    quotes['half_spread'] = 0.5 * (quotes['tob_ask'] - quotes['tob_bid'])
+    quotes['half_spread_bps'] = (quotes['tob_ask'] - quotes['tob_bid']) / (quotes['tob_ask'] + quotes['tob_bid'])
+    return quotes
+
+
 def evaluate_roll_model(trades):
     source_date = dt.datetime(2020, 7, 17)
     trades_day = trades.loc[trades.index.date == dt.datetime(2020, 7, 17).date()].copy()
@@ -113,11 +120,64 @@ def evaluate_roll_model(trades):
     print(f' - calc how long it takes to get out')
 
 
-def calc_tob_spread(source_date):
-    quotes = dutil.read_tob(source_date)
-    quotes['half_spread'] = 0.5 * (quotes['tob_ask'] - quotes['tob_bid'])
-    quotes['half_spread_bps'] = (quotes['tob_ask'] - quotes['tob_bid']) / (quotes['tob_ask'] + quotes['tob_bid'])
-    return quotes
+def high_low_volatility(trades):
+    trades['high_low'] = trades['high'] / trades['low']
+    trades['high_low'] = np.log(trades['high_low'])
+    trades['high_low_2'] = trades['high_low'] * trades['high_low']
+    high_low_avg = trades['high_low'].mean()
+    high_low_avg_2 = trades['high_low_2'].mean()
+    k_1 = 4 * np.log(2)
+    k_2 = np.sqrt(8 / 3.1415926)
+    sigma_2_HL = high_low_avg_2 / k_1
+    sigma_HL = high_low_avg / k_2
+    return sigma_HL, np.sqrt(sigma_2_HL)
+
+
+def volatility_on_close(trades):
+    trades['log_price'] = np.log(trades['close'])
+    trades['return'] = trades['log_price'].diff()
+    return trades['return'].std()
+
+
+def sample_time_bar(data, freq):
+    return data.resample(freq).agg({'high': np.max, 'low': np.min, 'close': 'last'})
+
+
+def sample_dollar_bar(data, bar_size):
+    data['bar'] = data['price'] * data['amount']
+    data['volume_count'] = data['bar'].cumsum()
+    data['volume_multi'] = np.floor(data['volume_count'] / bar_size)
+    data = data.reset_index()
+    rlt = data.groupby('volume_multi').agg({'timestamp': 'first', 'high': np.max, 'low': np.min, 'close': 'last'})
+    return rlt
+
+
+def evaluate_high_low_volatility(trades):
+    trades['high'] = trades['price']
+    trades['low'] = trades['price']
+    trades['close'] = trades['price']
+
+    for freq in ['10T', '1H']:
+        trades_bar = sample_time_bar(trades, freq)
+        vol_on_close = volatility_on_close(trades_bar)
+        vol_high_low, vol_high_low_1 = high_low_volatility(trades_bar)
+        print(
+            f'At {freq} time bar, n_bar = {len(trades_bar)}:\n'
+            f'  close_on_close volatility is {vol_on_close:.2%},\n'
+            f'  high_low volatility (from k1) is {vol_high_low_1:.2%},\n'
+            f'  high_low volatility (from k2) is {vol_high_low:.2%}.\n'
+        )
+
+    for bar_size in [1e+4, 1e+5]:
+        trades_bar = sample_dollar_bar(trades, bar_size)
+        vol_on_close = volatility_on_close(trades_bar)
+        vol_high_low, vol_high_low_1 = high_low_volatility(trades_bar)
+        print(
+            f'At {bar_size:,.0f} dollar bar, n_bar = {len(trades_bar)}:\n'
+            f'  close_on_close volatility is {vol_on_close:.2%},\n'
+            f'  high_low volatility (from k1) is {vol_high_low_1:.2%},\n'
+            f'  high_low volatility (from k2) is {vol_high_low:.2%}.\n'
+        )
 
 
 # def plot_factor_scatter(data, factors):
@@ -155,4 +215,6 @@ if __name__ == "__main__":
     trades = dutil.read_trades()
     # evaluate_tick_rule(trades)
     # roll_model(trades)
-    evaluate_roll_model(trades)
+    # evaluate_roll_model(trades)
+    evaluate_high_low_volatility(trades)
+    sample_dollar_bar(trades, 10000)
