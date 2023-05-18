@@ -213,8 +213,6 @@ def evaluate_high_low_volatility(trades):
 
 if __name__ == "__main__":
     trades = dutil.read_trades()
-    # evaluate_tick_rule(trades)
-    # roll_model(trades)
+    evaluate_tick_rule(trades)
     # evaluate_roll_model(trades)
-    evaluate_high_low_volatility(trades)
-    sample_dollar_bar(trades, 10000)
+    # evaluate_high_low_volatility(trades)
